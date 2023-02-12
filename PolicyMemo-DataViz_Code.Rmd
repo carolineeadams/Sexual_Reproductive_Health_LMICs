@@ -1,0 +1,164 @@
+---
+title: "PPOL563-PolicyBrief-Adams"
+author: "Caroline Adams"
+date: '2022-10-23'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#importing packages
+library(ggplot2)
+library(tidyverse)
+library(ggrepel)
+library(scales)
+library(ggthemes)
+library(gghighlight)
+library(dplyr)
+```
+
+```{r}
+#reading in data
+intl_dta=read.csv("AIU All Women Dataset.csv")
+```
+
+```{r}
+#subset data set
+
+#mat_death <- intl_dta %>%
+  #select(country, region, subregion, maternaldeath_no_cp_no_prncm, maternaldeath, maternaldeath_all_cp_curr_prnc, maternaldeath_curr_cp_all_prnc, maternaldeath_all_cp_all_prnc)
+#creating list of variable numbers
+var_num<-c(1,4,5,6,276,277,278,279)
+
+#creating a subset of variables
+vars<-c("country", "region", "subregion", "maternaldeath_no_cp_no_prncm", "maternaldeath", "maternaldeath_all_cp_curr_prnc", "maternaldeath_curr_cp_all_prnc", "maternaldeath_all_cp_all_prnc")
+
+#subsetting dataset
+mat_death<- intl_dta[,var_num]
+```
+
+```{r}
+#calculating new variable percent reduction in maternal deaths in all care needs met scenario
+vec<-((mat_death$maternaldeath - mat_death$maternaldeath_all_cp_curr_prnc)/mat_death$maternaldeath)*100
+```
+
+
+```{r}
+#adding variable to dataset
+mat_death$reduc <-vec
+#calculating new variable proportion of deaths reduced
+vec2<-mat_death$reduc/mat_death$wra
+
+#saving to variable in dataframe
+mat_death$reduc_prop <-vec2
+#mat_death$reduction <-mat_death$maternaldeath - mat_death$maternaldeath_all_cp_all_prnc
+```
+
+
+```{r}
+#creating new dataframe
+d2<-mat_death %>%
+  group_by(region) #%>%  #grouping by continent and primary_fuel
+```
+
+
+```{r}
+#creating new variable median reduction in deaths by region
+d2=d2 %>% mutate(region = region) %>%
+  group_by(region) %>% 
+  mutate(med_reduc = median(reduc))
+
+#initiating plot and setting x and y variables
+ggplot(d2, aes(x=reorder(region, reduc, FUN=median), y=reduc)) +
+  geom_boxplot(na.rm = TRUE) +
+  geom_jitter(aes(color=med_reduc), position = position_jitterdodge(jitter.width = 0.2, dodge.width = 0.8)) +
+  coord_flip() +
+  labs(y="Estimated Percentage Reduction in Maternal Mortality Rate (MMR)", 
+       title="Figure 1. All-Care-Needs-Met Scenario Would Yield \n Largest Reductions in Maternal Mortality Rate (MMR) in \n Latin America, the Caribbean, and Oceania", 
+       subtitle = "Distributions of estimated percent reduction in MMR by global \n region under all-care-needs-met scenario", 
+       color="Median")+
+  scale_y_continuous(labels = scales::percent_format(scale = 1), limits=c(0,50)) +
+  theme_bw() 
+#facet_wrap(~region, scales="free") 
+
+#saving plot as png
+#ggsave("mm_box.png")
+```
+
+```{r}
+#creating new dataframe with limited variables
+intvn<- intl_dta %>%
+  select(country, region, subregion, curr_costs_percap, curr_costs_cp_percap, curr_costs_prnc_percap, curr_costs_sti_percap, all_costs_percap, all_costs_cp_percap, all_costs_prnc_percap, all_costs_sti_percap, rate_matdeaths, maternaldeath, maternaldeath_all_cp_curr_prnc)
+```
+
+
+```{r}
+#calculating new variables
+#total cost reduction
+intvn$total_cost_reduc <- intvn$all_costs_percap- intvn$curr_costs_percap
+#percentage death reduction
+intvn$mat_death_reduc<-((mat_death$maternaldeath - mat_death$maternaldeath_all_cp_curr_prnc)/mat_death$maternaldeath)*100
+#total death reduction
+intvn$mat_death_reduc_num<-mat_death$maternaldeath - mat_death$maternaldeath_all_cp_curr_prnc
+```
+
+```{r}
+#plotting cost increase per capita vs estimated reduction in maternal deaths
+ggplot(intvn, aes(x=mat_death_reduc_num, y=total_cost_reduc)) +
+  geom_point(aes(color = ifelse(total_cost_reduc<11,'azure4', 'deepskyblue'))) +
+  facet_wrap(~region, scales="free") +
+  labs(y="Cost Increase Per Capita (USD)", 
+       x="Estimated Reduction in Maternal Deaths", 
+       title="Figure 3. Per Capita Investments of $10 or Less Could Save Tens to Thousands of \n Lives Globally", 
+       subtitle = "Estimated additional investment needed per capita (USD) to achieve all-care-needs-met scenario \n versus resulting estimated reduction in maternal deaths") +
+  scale_x_continuous(labels = scales::comma_format(accuracy = 1)) +
+  scale_y_continuous(labels = scales::dollar_format(scale = 1)) +
+  expand_limits(x = 0, y = 0) +
+  scale_colour_manual(labels = c("<$11", ">$11"), values=c('deepskyblue', 'azure4')) + 
+labs(color = "Investment (USD)") +
+  theme(
+  # Hide panel borders and remove grid lines
+  panel.border = element_blank(),
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  panel.background = element_blank(),
+  # Change axis line
+  axis.line = element_line(colour = "grey")) +
+  theme(legend.position = "bottom") 
+
+#saving plot as png
+#ggsave("facetdot.png")
+```
+
+
+```{r}
+#plotting cost increase per capita vs percentage reduction in deaths
+ggplot(intvn, aes(x=mat_death_reduc, y=total_cost_reduc)) +
+  geom_point(aes(color=region)) +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+panel.background = element_blank(), axis.line = element_line(colour = "black")) +
+  scale_color_manual(values =c("#ce4257", "#233d4d", "#ce4257", "#d1b3c4", "#5bc0be"))+
+  gghighlight(region==c("Latin America & the Caribbean", "Oceania"), use_direct_label = FALSE) +
+  labs(y="Cost Increase Per Capita (USD)", 
+       x="Estimated Percentage Reduction in Maternal Mortality Rate (MMR)", 
+       title="Figure 2. Reproductive Health Investments in Latin America & Oceania Would be \n Low Cost and High Reward", 
+       subtitle = "Estimated additional investment needed (USD) to achieve all-care-needs-met scenario versus \n estimated percentage reduction in MMR", color="Region") +
+  scale_x_continuous(labels = scales::percent_format(scale = 1), limits=c(0,50)) +
+  scale_y_continuous(labels = scales::dollar_format(scale = 1)) + 
+  theme(legend.position = "bottom") 
+
+#saving plot as png
+#ggsave("MMRscatter.png", dpi=300)
+```
+
+
+
+
+
+
+
+
+xx
